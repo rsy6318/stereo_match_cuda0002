@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.eclipse.cdt.launch.applicationLaunchType">
+<booleanAttribute key="nvvp.apiTraceProfiling" value="true"/>
+<booleanAttribute key="nvvp.appReplay" value="false"/>
+<booleanAttribute key="nvvp.concurrentProfiling" value="true"/>
+<booleanAttribute key="nvvp.environmentProfiling" value="false"/>
+<intAttribute key="nvvp.multiProcess" value="0"/>
+<booleanAttribute key="nvvp.openaccProfiling" value="true"/>
+<booleanAttribute key="nvvp.startProfiling" value="true"/>
+<intAttribute key="nvvp.timeout" value="-1"/>
+<booleanAttribute key="nvvp.uvmProfiling" value="false"/>
+<stringAttribute key="org.eclipse.cdt.debug.mi.core.DEBUG_NAME" value="${cuda_tk_bin:/hist}/cuda-gdb"/>
+<stringAttribute key="org.eclipse.cdt.debug.mi.core.GDB_INIT" value=".cuda-gdbinit"/>
+<stringAttribute key="org.eclipse.cdt.debug.mi.core.protocol" value="mi"/>
+<intAttribute key="org.eclipse.cdt.launch.ATTR_BUILD_BEFORE_LAUNCH_ATTR" value="2"/>
+<stringAttribute key="org.eclipse.cdt.launch.DEBUGGER_ID" value="com.nvidia.cuda.ide.debug.cudagdb"/>
+<stringAttribute key="org.eclipse.cdt.launch.DEBUGGER_START_MODE" value="run"/>
+<stringAttribute key="org.eclipse.cdt.launch.PROGRAM_NAME" value="${config_name:hist}/hist"/>
+<stringAttribute key="org.eclipse.cdt.launch.PROJECT_ATTR" value="hist"/>
+<stringAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_ID_ATTR" value="com.nvidia.cuda.ide.eight_zero.configuration.debug.149617769"/>
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
+<listEntry value="/hist"/>
+</listAttribute>
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
+<listEntry value="4"/>
+</listAttribute>
+<stringAttribute key="process_factory_id" value="org.eclipse.cdt.dsf.gdb.GdbProcessFactory"/>
+</launchConfiguration>

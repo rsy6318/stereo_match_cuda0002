@@ -1,0 +1,17 @@
+#include <opencv2/opencv.hpp>
+#include <iostream>
+using namespace cv;
+using namespace std;
+
+#define rows 992
+#define cols 1420
+
+int main()
+{
+	Mat im0=imread("im0.png");
+	Mat im1=imread("im1.png");
+
+	unsigned char *h_data0
+
+	return 0;
+}

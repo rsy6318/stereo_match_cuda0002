@@ -1,0 +1,72 @@
+21:58:29 **** Incremental Build of configuration Debug for project cuda_opengl2 ****
+make all 
+Building file: ../main.cu
+Invoking: NVCC Compiler
+/usr/local/cuda-8.0/bin/nvcc -I"/usr/local/cuda-8.0/samples/common/inc" -I"/home/rsy6318/cuda-workspace/cuda_opengl2" -G -g -O0 -gencode arch=compute_30,code=sm_30  -odir "." -M -o "main.d" "../main.cu"
+In file included from /usr/local/cuda-8.0/samples/common/inc/gl_helper.h:44:0,
+                 from /usr/local/cuda-8.0/samples/common/inc/gpu_anim.h:20,
+                 from ../main.cu:2:
+/usr/local/cuda-8.0/samples/common/inc/GL/glut.h:64:0: warning: "APIENTRY" redefined
+ #define APIENTRY
+ ^
+In file included from /usr/local/cuda-8.0/samples/common/inc/GL/glut.h:59:0,
+                 from /usr/local/cuda-8.0/samples/common/inc/gl_helper.h:44,
+                 from /usr/local/cuda-8.0/samples/common/inc/gpu_anim.h:20,
+                 from ../main.cu:2:
+/usr/include/GL/gl.h:88:0: note: this is the location of the previous definition
+ #define APIENTRY GLAPIENTRY
+ ^
+In file included from /usr/local/cuda-8.0/samples/common/inc/gl_helper.h:44:0,
+                 from /usr/local/cuda-8.0/samples/common/inc/gpu_anim.h:20,
+                 from ../main.cu:2:
+/usr/local/cuda-8.0/samples/common/inc/GL/glut.h:64:0: warning: "APIENTRY" redefined
+ #define APIENTRY
+ ^
+In file included from /usr/local/cuda-8.0/samples/common/inc/GL/glut.h:59:0,
+                 from /usr/local/cuda-8.0/samples/common/inc/gl_helper.h:44,
+                 from /usr/local/cuda-8.0/samples/common/inc/gpu_anim.h:20,
+                 from ../main.cu:2:
+/usr/include/GL/gl.h:88:0: note: this is the location of the previous definition
+ #define APIENTRY GLAPIENTRY
+ ^
+/usr/local/cuda-8.0/bin/nvcc -I"/usr/local/cuda-8.0/samples/common/inc" -I"/home/rsy6318/cuda-workspace/cuda_opengl2" -G -g -O0 --compile --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30  -x cu -o  "main.o" "../main.cu"
+In file included from /usr/local/cuda-8.0/samples/common/inc/gl_helper.h:44:0,
+                 from /usr/local/cuda-8.0/samples/common/inc/gpu_anim.h:20,
+                 from ../main.cu:2:
+/usr/local/cuda-8.0/samples/common/inc/GL/glut.h:64:0: warning: "APIENTRY" redefined
+ #define APIENTRY
+ ^
+In file included from /usr/local/cuda-8.0/samples/common/inc/GL/glut.h:59:0,
+                 from /usr/local/cuda-8.0/samples/common/inc/gl_helper.h:44,
+                 from /usr/local/cuda-8.0/samples/common/inc/gpu_anim.h:20,
+                 from ../main.cu:2:
+/usr/include/GL/gl.h:88:0: note: this is the location of the previous definition
+ #define APIENTRY GLAPIENTRY
+ ^
+/usr/local/cuda-8.0/samples/common/inc/gpu_anim.h(61): warning: conversion from a string literal to "char *" is deprecated
+
+In file included from /usr/local/cuda-8.0/samples/common/inc/gl_helper.h:44:0,
+                 from /usr/local/cuda-8.0/samples/common/inc/gpu_anim.h:20,
+                 from ../main.cu:2:
+/usr/local/cuda-8.0/samples/common/inc/GL/glut.h:64:0: warning: "APIENTRY" redefined
+ #define APIENTRY
+ ^
+In file included from /usr/local/cuda-8.0/samples/common/inc/GL/glut.h:59:0,
+                 from /usr/local/cuda-8.0/samples/common/inc/gl_helper.h:44,
+                 from /usr/local/cuda-8.0/samples/common/inc/gpu_anim.h:20,
+                 from ../main.cu:2:
+/usr/include/GL/gl.h:88:0: note: this is the location of the previous definition
+ #define APIENTRY GLAPIENTRY
+ ^
+/usr/local/cuda-8.0/samples/common/inc/gpu_anim.h(61): warning: conversion from a string literal to "char *" is deprecated
+
+Finished building: ../main.cu
+ 
+Building target: cuda_opengl2
+Invoking: NVCC Linker
+/usr/local/cuda-8.0/bin/nvcc --cudart static -L"/usr/local/cuda-8.0/samples/common/lib/linux/x86_64" -lGL -lGLU -lglut  --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30 -link -o  "cuda_opengl2"  ./main.o  /usr/local/cuda-8.0/samples/common/lib/linux/x86_64/libGLEW.a 
+Finished building target: cuda_opengl2
+ 
+
+21:58:30 Build Finished (took 1s.576ms)
+

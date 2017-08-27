@@ -1,0 +1,847 @@
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <math.h>
+#include "cuda.h"
+#include "cuda_runtime.h"
+#include "cuda_runtime_api.h"
+#include "device_launch_parameters.h"
+#include "device_functions.h"
+
+
+#include <helper_gl.h>
+#include <helper_cuda.h>
+#include <helper_cuda_gl.h>
+#include <helper_functions.h>
+#include <GL/freeglut.h>
+#include <vector_types.h>
+#include <driver_functions.h>
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
+#include <GL/glx.h>
+
+
+#define uchar unsigned char
+#define uint unsigned int
+
+using namespace std;
+using namespace cv;
+
+#define rows 288
+#define cols 384
+
+#define disp_max 16
+
+#define alpha_grad 0.89
+#define thres_color 0.0275
+#define thres_grad 0.0078
+#define cost_border 0.012
+#define win_radius 9
+#define epsilon 0.0001
+#define win_median_radius 9
+#define sigma_c 0.1
+#define sigma_p 9
+#define scale 15
+
+Mat iml,imr;
+Mat disp_l;
+Mat disp_r;
+dim3 threads(16,16);
+dim3 blocks(18,24);
+
+dim3 threads_3d(16,16,1);
+dim3 blocks_3d(18,24,disp_max+1);
+
+uchar iml_b[rows][cols];
+uchar iml_g[rows][cols];
+uchar iml_r[rows][cols];
+uchar imr_b[rows][cols];
+uchar imr_g[rows][cols];
+uchar imr_r[rows][cols];
+
+uchar iml_b_uchar[rows][cols];
+uchar iml_g_uchar[rows][cols];
+uchar iml_r_uchar[rows][cols];
+uchar imr_b_uchar[rows][cols];
+uchar imr_g_uchar[rows][cols];
+uchar imr_r_uchar[rows][cols];
+
+uchar (*gpu_disp_l)[cols];
+uchar (*gpu_disp_r)[cols];
+
+__global__ void uchar2uchar4(uchar (*a)[cols],uchar3 (*b)[cols])
+{
+	const uint idx=(blockIdx.x*blockDim.x)+threadIdx.x;
+	const uint idy=(blockIdx.y*blockDim.y)+threadIdx.y;
+	b[idx][idy].x=a[rows-1-idx][idy];
+	b[idx][idy].y=a[rows-1-idx][idy];
+	b[idx][idy].z=a[rows-1-idx][idy];
+}
+
+__global__ void uchar2float(uchar (*a)[cols],float (*b)[cols])
+{
+	const uint idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	b[idx][idy]=float(a[idx][idy]/255.0);
+}
+
+__global__ void float2uchar(float (*a)[cols],uchar (*b)[cols])
+{
+	const uint idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	b[idx][idy]=(uchar)(int)(a[idx][idy]);
+}
+
+__global__ void bgr2gray(float (*b)[cols],float (*g)[cols],float (*r)[cols],float (*gray)[cols])
+{
+	const uint idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	gray[idx][idy]=0.114*b[idx][idy]+0.587*g[idx][idy]+0.299*r[idx][idy];
+}
+
+__global__ void flip_kernel(float (*input)[cols],float (*output)[cols])
+{
+	const uint idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	output[idx][idy]=input[idx][cols-1-idy];
+}
+
+__global__ void flip_kernel_3d(float (*input)[rows][cols],float (*output)[rows][cols])
+{
+	const uint idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	const uint idz=(blockIdx.z*blockDim.z)+threadIdx.z;
+	output[idz][idx][idy]=input[idz][idx][cols-1-idy];
+}
+
+__global__ void flip_kernel_uchar(uchar (*input)[cols],uchar (*output)[cols])
+{
+	const uint idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	output[idx][idy]=input[idx][cols-1-idy];
+}
+
+__global__ void gray2gradient(float (*gray)[cols],float (*grad)[cols])
+{
+	const uint idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	if((idy>=1)&&(idy<cols-1))
+	{
+		grad[idx][idy]=abs(gray[idx][idy+1]-gray[idx][idy-1]);
+	}
+}
+
+__global__ void equal_kernel(float (*a)[rows][cols],float (*b)[rows][cols] )
+{
+	const uint idx=(blockIdx.x*blockDim.x)+threadIdx.x;
+	const uint idy=(blockIdx.y*blockDim.y)+threadIdx.y;
+	const uint idz=(blockIdx.z*blockDim.z)+threadIdx.z;
+	b[idz][idx][idy]=a[idz][idx][idy];
+}
+
+__global__ void kernel_cost_volume(	float (*iml_b1)[cols],float (*iml_g1)[cols],float (*iml_r1)[cols],
+																					float (*imr_b1)[cols],float (*imr_g1)[cols],float (*imr_r1)[cols],
+																					float (*iml_b_mirror1)[cols],float (*iml_g_mirror1)[cols],float (*iml_r_mirror1)[cols],
+																					float (*imr_b_mirror1)[cols],float (*imr_g_mirror1)[cols],float (*imr_r_mirror1)[cols],
+																					float (*iml_gray_grad_x1)[cols],float (*imr_gray_grad_x1)[cols],
+																					float (*iml_gray_grad_x_mirror1)[cols],float (*imr_gray_grad_x_mirror1)[cols],
+																					float (*cost_l)[rows][cols],float (*cost_r)[rows][cols])
+{
+		const uint idx=(blockIdx.x*blockDim.x)+threadIdx.x;
+		const uint idy=(blockIdx.y*blockDim.y)+threadIdx.y;
+		float imr_b_shift1;
+		float imr_g_shift1;
+		float imr_r_shift1;
+		float imr_gray_grad_x_shift1;
+		float iml_b_mirror_shift1;
+		float iml_g_mirror_shift1;
+		float iml_r_mirror_shift1;
+		float iml_gray_grad_x_mirror_shift1;
+		float color_diff_l1;
+		float grad_diff_l1;
+		float color_diff_r1;
+		float grad_diff_r1;
+		for(int d=0;d<disp_max+1;d++)
+		{
+			if(idy<d)
+			{
+				imr_b_shift1=0;
+				imr_g_shift1 = 0;
+				imr_r_shift1 = 0;
+				imr_gray_grad_x_shift1 = 0;
+				iml_b_mirror_shift1 = 0;
+				iml_g_mirror_shift1= 0;
+				iml_r_mirror_shift1= 0;
+				iml_gray_grad_x_mirror_shift1 = 0;
+			}
+			if(idy>=d)
+			{
+				imr_b_shift1 = imr_b1[idx][idy-d];
+				imr_g_shift1= imr_g1[idx][idy-d];
+				imr_r_shift1 = imr_r1[idx][idy-d];
+				imr_gray_grad_x_shift1 = imr_gray_grad_x1[idx][idy-d];
+				iml_b_mirror_shift1 = iml_b_mirror1[idx][idy - d];
+				iml_g_mirror_shift1 = iml_g_mirror1[idx][idy - d];
+				iml_r_mirror_shift1 = iml_r_mirror1[idx][idy - d];
+				iml_gray_grad_x_mirror_shift1 = iml_gray_grad_x_mirror1[idx][idy-d];
+			}
+			color_diff_l1=(abs(imr_b_shift1 - iml_b1[idx][idy]) + abs(imr_g_shift1 - iml_g1[idx][idy]) + abs(imr_r_shift1 - iml_r1[idx][idy])) / 3.0;
+			grad_diff_l1= abs(imr_gray_grad_x_shift1 - iml_gray_grad_x1[idx][idy]);
+			if(color_diff_l1>thres_color)
+				color_diff_l1=thres_color;
+			if(grad_diff_l1>thres_grad)
+				grad_diff_l1=thres_grad;
+			cost_l[d][idx][idy]=(1.0-alpha_grad)*color_diff_l1+alpha_grad*grad_diff_l1;
+
+			color_diff_r1= (abs(iml_b_mirror_shift1 - imr_b_mirror1[idx][idy]) + abs(iml_g_mirror_shift1 - imr_g_mirror1[idx][idy]) + abs(iml_r_mirror_shift1 - imr_r_mirror1[idx][idy])) / 3.0;
+			grad_diff_r1 = abs(iml_gray_grad_x_mirror_shift1 - imr_gray_grad_x_mirror1[idx][idy]);
+			if (color_diff_r1>thres_color)
+				color_diff_r1 = thres_color;
+			if (grad_diff_r1>thres_grad)
+				grad_diff_r1 = thres_grad;
+			cost_r[d][idx][idy]= (1.0 - alpha_grad)*color_diff_r1 + alpha_grad*grad_diff_r1;
+		}
+}
+
+__global__ void im_2d_2_3d(float (*input)[cols],float (*output)[cols][disp_max+1],int *d)
+{
+	const uint idx=(blockIdx.x*blockDim.x)+threadIdx.x;
+	const uint idy=(blockIdx.y*blockDim.y)+threadIdx.y;
+	output[idx][idy][*d]=input[idx][idy];
+}
+
+__global__ void im_3d_2_2d(float (*input)[cols][disp_max+1],float (*output)[cols],int *d)
+{
+	const uint idx=(blockIdx.x*blockDim.x)+threadIdx.x;
+	const uint idy=(blockIdx.y*blockDim.y)+threadIdx.y;
+	output[idx][idy]=input[idx][idy][*d];
+}
+
+//c=a*b
+__global__ void mul_kernel(float (*a)[cols],float (*b)[cols],float(*c)[cols])
+{
+	const unsigned int idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const unsigned int idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	c[idx][idy] = a[idx][idy] * b[idx][idy];
+}
+
+__global__ void mul_kernel_3d(float(*a)[cols], float(*b)[rows][cols], float(*c)[rows][cols])
+{
+	const unsigned int idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const unsigned int idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	for(int d=0;d<disp_max+1;d++)
+	{
+		c[d][idx][idy] = a[idx][idy] * b[d][idx][idy];
+	}
+}
+
+//d=a-b*c
+__global__ void a_devide_b_mul_c(float(*a)[cols], float(*b)[cols], float(*c)[cols],float (*d)[cols])
+{
+	const unsigned int idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const unsigned int idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	d[idx][idy] = a[idx][idy] - b[idx][idy]*c[idx][idy];
+}
+__global__ void a_devide_b_mul_c_3d(float(*a)[rows][cols], float(*b)[cols], float(*c)[rows][cols],float (*d)[rows][cols])
+{
+	const unsigned int idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const unsigned int idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	for(int dd=0;dd<disp_max+1;dd++)
+	{
+		d[dd][idx][idy] = a[dd][idx][idy] - b[idx][idy]*c[dd][idx][idy];
+	}
+}
+
+__device__ void Inverse_3_3_device(float (*A)[3], float (*B)[3])
+{
+	int i, j, k, n;
+	n = 3;
+	float max, temp;
+	float t[3][3];
+	for (i = 0; i < n; i++)
+	{
+		for (j = 0; j < n; j++)
+		{
+			t[i][j] = A[i][j];
+		}
+	}
+	for (i = 0; i < n; i++)
+	{
+		for (j = 0; j < n; j++)
+		{
+			B[i][j] = (i == j) ? (float)1 : 0;
+		}
+	}
+	for (i = 0; i < n; i++)
+	{
+		max = t[i][i];
+		k = i;
+		for (j = i + 1; j < n; j++)
+		{
+			if (fabs(t[j][i]) > fabs(max))
+			{
+				max = t[j][i];
+				k = j;
+			}
+		}
+		if (k != i)
+		{
+			for (j = 0; j < n; j++)
+			{
+				temp = t[i][j];
+				t[i][j] = t[k][j];
+				t[k][j] = temp;
+				temp = B[i][j];
+				B[i][j] = B[k][j];
+				B[k][j] = temp;
+			}
+		}
+		temp = t[i][i];
+		for (j = 0; j < n; j++)
+		{
+			t[i][j] = t[i][j] / temp;
+			B[i][j] = B[i][j] / temp;
+		}
+		for (j = 0; j < n; j++)
+		{
+			if (j != i)
+			{
+				temp = t[j][i];
+				for (k = 0; k < n; k++)
+				{
+					t[j][k] = t[j][k] - t[i][k] * temp;
+					B[j][k] = B[j][k] - B[i][k] * temp;
+				}
+			}
+		}
+	}
+}
+
+__global__ void solve_a_and_b_kernel(	float (*cov_Ip_b)[rows][cols],float (*cov_Ip_g)[rows][cols],float (*cov_Ip_r)[rows][cols],
+																						float (*var_I_bb)[cols],float (*var_I_bg)[cols],float (*var_I_br)[cols],
+																						float (*var_I_gg)[cols],float (*var_I_gr)[cols],float (*var_I_rr)[cols],
+																						float (*a_b)[rows][cols],float (*a_g)[rows][cols],float (*a_r)[rows][cols],
+																						float (*b)[rows][cols],float (*p)[rows][cols],
+																						float (*I_b)[cols],float (*I_g)[cols],float (*I_r)[cols])
+{
+	const unsigned int idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const unsigned int idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	const unsigned int d= (blockIdx.z*blockDim.z) + threadIdx.z;
+	//for(int d=0;d<disp_max+1;d++)
+	//{
+		if ((idx >=win_radius) && (idx < rows - 1 - win_radius) && (idy >= win_radius) && (idy < cols - 1 - win_radius))
+		{
+			float sigma[3][3];
+			float inv_sigma[3][3]={0.0};
+			sigma[0][0] = var_I_bb[idx][idy] + epsilon;
+			sigma[0][1] = var_I_bg[idx][idy];
+			sigma[0][2] = var_I_br[idx][idy];
+			sigma[1][0] = var_I_bg[idx][idy];
+			sigma[1][1] = var_I_gg[idx][idy] + epsilon;
+			sigma[1][2] = var_I_gr[idx][idy];
+			sigma[2][0] = var_I_br[idx][idy];
+			sigma[2][1] = var_I_gr[idx][idy];
+			sigma[2][2] = var_I_rr[idx][idy] + epsilon;
+			Inverse_3_3_device(sigma, inv_sigma);
+
+			a_b[d][idx][idy] = cov_Ip_b[d][idx][idy] * inv_sigma[0][0] + cov_Ip_g[d][idx][idy] * inv_sigma[1][0] + cov_Ip_r[d][idx][idy] * inv_sigma[2][0];
+			a_g[d][idx][idy] = cov_Ip_b[d][idx][idy] * inv_sigma[0][1] + cov_Ip_g[d][idx][idy] * inv_sigma[1][1] + cov_Ip_r[d][idx][idy] * inv_sigma[2][1];
+			a_r[d][idx][idy] = cov_Ip_b[d][idx][idy] * inv_sigma[0][2] + cov_Ip_g[d][idx][idy] * inv_sigma[1][2] + cov_Ip_r[d][idx][idy] * inv_sigma[2][2];
+			b[d][idx][idy]=p[d][idx][idy]-a_b[d][idx][idy]*I_b[idx][idy]-a_g[d][idx][idy]*I_g[idx][idy]-a_r[d][idx][idy]*I_r[idx][idy];
+		}
+		else
+		{
+			a_b[d][idx][idy]=0;
+			a_g[d][idx][idy]=0;
+			a_r[d][idx][idy]=0;
+			b[d][idx][idy]=0;
+		}
+	//}
+}
+
+__global__ void boxfilter_kernel(float (*input)[cols],float (*output)[cols])
+{
+	const uint idx= (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	if ((idx >= win_radius) && (idx < rows - 1 - win_radius) && (idy >= win_radius) && (idy < cols - 1 - win_radius))
+	{
+		float sum = 0;
+		for (int x = idx-win_radius; x <idx+win_radius+1 ; x++)
+		{
+			for (int y =idy-win_radius ; y <idy+win_radius+1 ; y++)
+			{
+				sum += input[x][y];
+			}
+		}
+		output[idx][idy] = sum / (win_radius*2 + 1)/(2*win_radius+1);
+	}
+	else
+	{
+		output[idx][idy] = 0.0;
+	}
+}
+
+__global__ void boxfilter_kernel_3d(float (*input)[rows][cols],float (*output)[rows][cols])
+{
+	const uint idx= (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	const uint d = (blockIdx.z*blockDim.z) + threadIdx.z;
+	//for(int d=0;d<disp_max+1;d++)
+	//{
+		if ((idx >= win_radius) && (idx < rows - 1 - win_radius) && (idy >= win_radius) && (idy < cols - 1 - win_radius))
+		{
+			float sum =0.0;
+			for (int x = idx-win_radius; x <idx+win_radius+1 ; x++)
+			{
+				for (int y =idy-win_radius ; y <idy+win_radius+1 ; y++)
+				{
+					sum += input[d][x][y];
+				}
+			}
+			output[d][idx][idy]= sum / (win_radius*2 + 1)/(2*win_radius+1);
+		}
+		else
+		{
+			output[d][idx][idy] = 0.0;
+		}
+	//}
+}
+
+__global__ void WTA_kernel(float (*cost_volume)[rows][cols],uchar (*disp)[cols],uchar scale1)
+{
+	const uint idx=(blockIdx.x*blockDim.x)+threadIdx.x;
+	const uint idy=(blockIdx.y*blockDim.y)+threadIdx.y;
+	uchar d_now=0;
+	float cost_now=cost_volume[0][idx][idy];
+	for(int d=1;d<disp_max+1;d++)
+	{
+		if(cost_now>cost_volume[d][idx][idy])
+		{
+			d_now=d;
+			cost_now=cost_volume[d][idx][idy];
+		}
+	}
+	disp[idx][idy]=d_now*scale1;
+}
+
+__global__ void solve_cost_volume(float (*I_b)[cols],float (*I_g)[cols],float (*I_r)[cols],
+																				float (*a_b)[rows][cols],float (*a_g)[rows][cols],float (*a_r)[rows][cols],
+																				float (*b)[rows][cols],float (*output)[rows][cols])
+{
+	const unsigned int idx = (blockIdx.x*blockDim.x) + threadIdx.x;
+	const unsigned int idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	for(int d=0;d<disp_max+1;d++)
+	{
+		output[d][idx][idy]=a_b[d][idx][idy]*I_b[idx][idy]+a_g[d][idx][idy]*I_r[idx][idy]+a_r[d][idx][idy]*I_r[idx][idy]+b[d][idx][idy];
+	}
+}
+
+
+//定义CUDA变量
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+float (*gpu_iml_b)[cols];
+float (*gpu_iml_g)[cols];
+float (*gpu_iml_r)[cols];
+float (*gpu_iml_gray)[cols];
+float (*gpu_imr_b)[cols];
+float (*gpu_imr_g)[cols];
+float (*gpu_imr_r)[cols];
+float (*gpu_imr_gray)[cols];
+
+uchar (*gpu_iml_b_uchar)[cols];
+uchar (*gpu_iml_g_uchar)[cols];
+uchar (*gpu_iml_r_uchar)[cols];
+uchar (*gpu_imr_b_uchar)[cols];
+uchar (*gpu_imr_g_uchar)[cols];
+uchar (*gpu_imr_r_uchar)[cols];
+
+float (*gpu_iml_b_mirror)[cols];
+float (*gpu_iml_g_mirror)[cols];
+float (*gpu_iml_r_mirror)[cols];
+float (*gpu_imr_b_mirror)[cols];
+float (*gpu_imr_g_mirror)[cols];
+float (*gpu_imr_r_mirror)[cols];
+
+float (*gpu_iml_gray_grad_x)[cols];
+float (*gpu_imr_gray_grad_x)[cols];
+float (*gpu_iml_gray_grad_x_mirror)[cols];
+float (*gpu_imr_gray_grad_x_mirror)[cols];
+
+float (*gpu_cost_l)[rows][cols];
+float (*gpu_cost_r)[rows][cols];
+float (*gpu_cost_r_now)[rows][cols];
+
+float (*gpu_cost_l_mean)[rows][cols];
+float (*gpu_cost_r_mean)[rows][cols];
+//--------------------------------------------------------------------------------------------------------------------
+float (*gpu_iml_b_mean)[cols];
+float (*gpu_iml_g_mean)[cols];
+float (*gpu_iml_r_mean)[cols];
+float (*gpu_imr_b_mean)[cols];
+float (*gpu_imr_g_mean)[cols];
+float (*gpu_imr_r_mean)[cols];
+
+float (*gpu_iml_bb)[cols];
+float (*gpu_iml_bg)[cols];
+float (*gpu_iml_br)[cols];
+float (*gpu_iml_gg)[cols];
+float (*gpu_iml_gr)[cols];
+float (*gpu_iml_rr)[cols];
+float (*gpu_imr_bb)[cols];
+float (*gpu_imr_bg)[cols];
+float (*gpu_imr_br)[cols];
+float (*gpu_imr_gg)[cols];
+float (*gpu_imr_gr)[cols];
+float (*gpu_imr_rr)[cols];
+float (*gpu_iml_bb_mean)[cols];
+float (*gpu_iml_bg_mean)[cols];
+float (*gpu_iml_br_mean)[cols];
+float (*gpu_iml_gg_mean)[cols];
+float (*gpu_iml_gr_mean)[cols];
+float (*gpu_iml_rr_mean)[cols];
+float (*gpu_imr_bb_mean)[cols];
+float (*gpu_imr_bg_mean)[cols];
+float (*gpu_imr_br_mean)[cols];
+float (*gpu_imr_gg_mean)[cols];
+float (*gpu_imr_gr_mean)[cols];
+float (*gpu_imr_rr_mean)[cols];
+
+float (*gpu_iml_p_b)[rows][cols];
+float (*gpu_iml_p_g)[rows][cols];
+float (*gpu_iml_p_r)[rows][cols];
+float (*gpu_imr_p_b)[rows][cols];
+float (*gpu_imr_p_g)[rows][cols];
+float (*gpu_imr_p_r)[rows][cols];
+float (*gpu_iml_p_b_mean)[rows][cols];
+float (*gpu_iml_p_g_mean)[rows][cols];
+float (*gpu_iml_p_r_mean)[rows][cols];
+float (*gpu_imr_p_b_mean)[rows][cols];
+float (*gpu_imr_p_g_mean)[rows][cols];
+float (*gpu_imr_p_r_mean)[rows][cols];
+
+float (*gpu_cov_iml_b)[rows][cols];
+float (*gpu_cov_iml_g)[rows][cols];
+float (*gpu_cov_iml_r)[rows][cols];
+float (*gpu_cov_imr_b)[rows][cols];
+float (*gpu_cov_imr_g)[rows][cols];
+float (*gpu_cov_imr_r)[rows][cols];
+float (*gpu_var_iml_bb)[cols];
+float (*gpu_var_iml_bg)[cols];
+float (*gpu_var_iml_br)[cols];
+float (*gpu_var_iml_gg)[cols];
+float (*gpu_var_iml_gr)[cols];
+float (*gpu_var_iml_rr)[cols];
+float (*gpu_var_imr_bb)[cols];
+float (*gpu_var_imr_bg)[cols];
+float (*gpu_var_imr_br)[cols];
+float (*gpu_var_imr_gg)[cols];
+float (*gpu_var_imr_gr)[cols];
+float (*gpu_var_imr_rr)[cols];
+
+float (*gpu_a_b_l)[rows][cols];
+float (*gpu_a_g_l)[rows][cols];
+float (*gpu_a_r_l)[rows][cols];
+float (*gpu_b_l)[rows][cols];
+float (*gpu_a_b_l_mean)[rows][cols];
+float (*gpu_a_g_l_mean)[rows][cols];
+float (*gpu_a_r_l_mean)[rows][cols];
+float (*gpu_b_l_mean)[rows][cols];
+
+float (*gpu_a_b_r)[rows][cols];
+float (*gpu_a_g_r)[rows][cols];
+float (*gpu_a_r_r)[rows][cols];
+float (*gpu_b_r)[rows][cols];
+float (*gpu_a_b_r_mean)[rows][cols];
+float (*gpu_a_g_r_mean)[rows][cols];
+float (*gpu_a_r_r_mean)[rows][cols];
+float (*gpu_b_r_mean)[rows][cols];
+//------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+//OPENGL
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+GLuint  bufferObj;
+cudaGraphicsResource *resource;
+
+static void key_func( unsigned char key, int x, int y )
+{
+	if(key>0)
+	{
+	       cudaGraphicsUnregisterResource( resource ) ;
+	       glBindBuffer( GL_PIXEL_UNPACK_BUFFER_ARB, 0 );
+	       glDeleteBuffers( 1, &bufferObj );
+	       exit(0);
+	}
+}
+
+	static void draw_func( void )
+	{
+	    glDrawPixels( cols, rows, GL_RGB, GL_UNSIGNED_BYTE, 0 );
+	    glutSwapBuffers();
+	}
+
+//-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+int main(int argc,char **argv)
+{
+	//opengl初始化
+	cudaDeviceProp  prop;
+	int dev;
+
+	memset( &prop, 0, sizeof( cudaDeviceProp ) );
+	prop.major = 1;
+	prop.minor = 0;
+	cudaChooseDevice( &dev, &prop ) ;
+	cudaGLSetGLDevice( dev );
+
+	glutInit(&argc,argv);
+	glutInitDisplayMode(GLUT_RGB);
+	glutInitWindowSize(cols,rows);
+	glutCreateWindow("bitmap");
+
+
+	glGenBuffers(1,&bufferObj);
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB,bufferObj);
+	glBufferData(GL_PIXEL_UNPACK_BUFFER_ARB,rows*cols*3,NULL,GL_DYNAMIC_DRAW_ARB);
+
+	cudaGraphicsGLRegisterBuffer( &resource,bufferObj,cudaGraphicsMapFlagsNone );
+	cudaGraphicsMapResources( 1, &resource, NULL );
+	uchar3 (*devPtr1)[cols];
+	uchar3 (*devPtr2)[cols];
+	size_t size;
+	cudaGraphicsResourceGetMappedPointer((void **)&devPtr1,&size,resource);
+	cudaGraphicsResourceGetMappedPointer((void **)&devPtr2,&size,resource);
+	//--------------------------------------------------------------------------------------------------------------------
+	//初始化
+	disp_l.create(rows,cols,CV_8UC1);
+	disp_r.create(rows,cols,CV_8UC1);
+	//--------------------------------------------------------------------------------------------------------------------
+	cudaMalloc((void **)&gpu_iml_b,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_g,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_r,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_b,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_g,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_r,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_gray,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_gray,rows*cols*sizeof(float));
+
+	cudaMalloc((void **)&gpu_iml_b_uchar,rows*cols*sizeof(uchar));
+	cudaMalloc((void **)&gpu_iml_g_uchar,rows*cols*sizeof(uchar));
+	cudaMalloc((void **)&gpu_iml_r_uchar,rows*cols*sizeof(uchar));
+	cudaMalloc((void **)&gpu_imr_b_uchar,rows*cols*sizeof(uchar));
+	cudaMalloc((void **)&gpu_imr_g_uchar,rows*cols*sizeof(uchar));
+	cudaMalloc((void **)&gpu_imr_r_uchar,rows*cols*sizeof(uchar));
+
+	cudaMalloc((void **)&gpu_iml_b_mirror,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_g_mirror,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_r_mirror,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_b_mirror,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_g_mirror,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_r_mirror,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_gray_grad_x,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_gray_grad_x,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_gray_grad_x_mirror,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_gray_grad_x_mirror,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_cost_l,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_cost_r,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_cost_l_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_cost_r_mean,(1+disp_max)*rows*cols*sizeof(float));
+	//---------------------------------------------------------------------------------------------------------------
+	cudaMalloc((void **)&gpu_iml_b_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_g_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_r_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_b_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_g_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_r_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_bb,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_bg,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_br,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_gg,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_gr,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_rr,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_bb,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_bg,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_br,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_gg,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_gr,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_rr,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_bb_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_bg_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_br_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_gg_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_gr_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_rr_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_bb_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_bg_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_br_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_gg_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_gr_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_rr_mean,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_cov_iml_b,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_cov_iml_g,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_cov_iml_r,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_cov_imr_b,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_cov_imr_g,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_cov_imr_r,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_iml_bb,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_iml_bg,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_iml_br,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_iml_gg,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_iml_gr,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_iml_rr,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_imr_bb,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_imr_bg,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_imr_br,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_imr_gg,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_imr_gr,rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_var_imr_rr,rows*cols*sizeof(float));
+
+	cudaMalloc((void **)&gpu_iml_p_b_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_p_g_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_p_r_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_p_b_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_p_g_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_p_r_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_p_b,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_p_g,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_iml_p_r,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_p_b,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_p_g,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_imr_p_r,(1+disp_max)*rows*cols*sizeof(float));
+
+	cudaMalloc((void **)&gpu_a_b_l,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_a_g_l,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_a_r_l,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_b_l,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_a_b_l_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_a_g_l_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_a_r_l_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_b_l_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_a_b_r,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_a_g_r,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_a_r_r,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_b_r,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_a_b_r_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_a_g_r_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_a_r_r_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_b_r_mean,(1+disp_max)*rows*cols*sizeof(float));
+	cudaMalloc((void **)&gpu_disp_l,rows*cols*sizeof(uchar));
+	cudaMalloc((void **)&gpu_disp_r,rows*cols*sizeof(uchar));
+	cudaMalloc((void **)&gpu_cost_r_now,rows*cols*(disp_max+1)*sizeof(float));
+
+	//--------------------------------------------------------------------------------------------------------------------
+	iml=imread("im2.ppm");
+	imr=imread("im6.ppm");
+	for(int x=0;x<rows;x++)
+	{
+		for(int y=0;y<cols;y++)
+		{
+			iml_b_uchar[x][y]=iml.at<Vec3b>(x,y)[0];
+			iml_g_uchar[x][y]=iml.at<Vec3b>(x,y)[1];
+			iml_r_uchar[x][y]=iml.at<Vec3b>(x,y)[2];
+			imr_b_uchar[x][y]=imr.at<Vec3b>(x,y)[0];
+			imr_g_uchar[x][y]=imr.at<Vec3b>(x,y)[1];
+			imr_r_uchar[x][y]=imr.at<Vec3b>(x,y)[2];
+		}
+	}
+	float time;
+	float time1,time2,time3,time4,time5;
+	clock_t start,finish;
+
+	//------------------------------------------------------------------------------------------------------------------------------------------
+	//转移数据    CPU->GPU
+	start=clock();
+	cudaMemcpy(gpu_iml_b_uchar,iml_b_uchar,rows*cols*sizeof(uchar),cudaMemcpyHostToDevice);
+	cudaMemcpy(gpu_iml_g_uchar,iml_g_uchar,rows*cols*sizeof(uchar),cudaMemcpyHostToDevice);
+	cudaMemcpy(gpu_iml_r_uchar,iml_r_uchar,rows*cols*sizeof(uchar),cudaMemcpyHostToDevice);
+	cudaMemcpy(gpu_imr_b_uchar,imr_b_uchar,rows*cols*sizeof(uchar),cudaMemcpyHostToDevice);
+	cudaMemcpy(gpu_imr_g_uchar,imr_g_uchar,rows*cols*sizeof(uchar),cudaMemcpyHostToDevice);
+	cudaMemcpy(gpu_imr_r_uchar,imr_r_uchar,rows*cols*sizeof(uchar),cudaMemcpyHostToDevice);
+	finish=clock();
+	time1=float(finish-start)/CLOCKS_PER_SEC;
+	printf("转移数据CPU->GPU花费了%lfs\n",time1);
+	//------------------------------------------------------------------------------------------------------------------------------------------
+
+	//------------------------------------------------------------------------------------------------------------------------------------------
+	//计算初始代价空间
+	start=clock();
+	uchar2float<<<blocks,threads>>>(gpu_iml_b_uchar,gpu_iml_b);
+	uchar2float<<<blocks,threads>>>(gpu_iml_g_uchar,gpu_iml_g);
+	uchar2float<<<blocks,threads>>>(gpu_iml_r_uchar,gpu_iml_r);
+	uchar2float<<<blocks,threads>>>(gpu_imr_b_uchar,gpu_imr_b);
+	uchar2float<<<blocks,threads>>>(gpu_imr_g_uchar,gpu_imr_g);
+	uchar2float<<<blocks,threads>>>(gpu_imr_r_uchar,gpu_imr_r);
+
+	bgr2gray<<<blocks,threads>>>(gpu_iml_b,gpu_iml_g,gpu_iml_r,gpu_iml_gray);
+	bgr2gray<<<blocks,threads>>>(gpu_imr_b,gpu_imr_g,gpu_imr_r,gpu_imr_gray);
+
+	gray2gradient<<<blocks,threads>>>(gpu_iml_gray,gpu_iml_gray_grad_x);
+	gray2gradient<<<blocks,threads>>>(gpu_imr_gray,gpu_imr_gray_grad_x);
+
+	flip_kernel<<<blocks,threads>>>(gpu_iml_b,gpu_iml_b_mirror);
+	flip_kernel<<<blocks,threads>>>(gpu_iml_g,gpu_iml_g_mirror);
+	flip_kernel<<<blocks,threads>>>(gpu_iml_r,gpu_iml_r_mirror);
+	flip_kernel<<<blocks,threads>>>(gpu_imr_b,gpu_imr_b_mirror);
+	flip_kernel<<<blocks,threads>>>(gpu_imr_g,gpu_imr_g_mirror);
+	flip_kernel<<<blocks,threads>>>(gpu_imr_r,gpu_imr_r_mirror);
+	flip_kernel<<<blocks,threads>>>(gpu_iml_gray_grad_x,gpu_iml_gray_grad_x_mirror);
+	flip_kernel<<<blocks,threads>>>(gpu_imr_gray_grad_x,gpu_imr_gray_grad_x_mirror);
+
+	kernel_cost_volume<<<blocks,threads>>>(	gpu_iml_b,gpu_iml_g,gpu_iml_r,
+																									gpu_imr_b,gpu_imr_g,gpu_imr_r,
+																									gpu_iml_b_mirror,gpu_iml_g_mirror,gpu_iml_r_mirror,
+																									gpu_imr_b_mirror,gpu_imr_g_mirror,gpu_imr_r_mirror,
+																									gpu_iml_gray_grad_x,gpu_imr_gray_grad_x,
+																									gpu_iml_gray_grad_x_mirror,gpu_imr_gray_grad_x_mirror,
+																									gpu_cost_l,gpu_cost_r);
+
+	flip_kernel_3d<<<blocks_3d,threads_3d>>>(gpu_cost_r,gpu_cost_r_now);
+	equal_kernel<<<blocks_3d,threads_3d>>>(gpu_cost_r_now,gpu_cost_r);
+
+	finish=clock();
+	time2=float(finish-start)/CLOCKS_PER_SEC;
+	printf("计算初始代价空间花费了%lfs\n",time2);
+	//------------------------------------------------------------------------------------------------------------------------------------------
+
+	//引导滤波代价聚合
+	//------------------------------------------------------------------------------------------------------------------------------------------
+	start=clock();
+
+	finish=clock();
+	time3=float(finish-start)/CLOCKS_PER_SEC;
+	printf("引导滤波代价聚合花费了%lfs\n",time3);
+	//------------------------------------------------------------------------------------------------------------------------------------------
+
+	//WTA
+	//------------------------------------------------------------------------------------------------------------------------------------------
+	start=clock();
+	WTA_kernel<<<blocks,threads>>>(gpu_cost_l,gpu_disp_l,scale);
+	WTA_kernel<<<blocks,threads>>>(gpu_cost_r,gpu_disp_r,scale);
+	finish=clock();
+	time4=float(finish-start)/CLOCKS_PER_SEC;
+	printf("WTA花费了%lfs\n",time4);
+	//------------------------------------------------------------------------------------------------------------------------------------------
+
+	//转移数据 GPU->CPU
+	//------------------------------------------------------------------------------------------------------------------------------------------
+	start=clock();
+	//cudaMemcpy(disp_l.data,gpu_disp_l,rows*cols*sizeof(uchar),cudaMemcpyDeviceToHost);
+	//cudaMemcpy(disp_r.data,gpu_disp_r,rows*cols*sizeof(uchar),cudaMemcpyDeviceToHost);
+
+	uchar2uchar4<<<blocks,threads>>>(gpu_disp_l,devPtr1);
+	uchar2uchar4<<<blocks,threads>>>(gpu_disp_r,devPtr2);
+
+	cudaGraphicsUnmapResources( 1, &resource, NULL );
+	glutKeyboardFunc( key_func );
+	glutDisplayFunc( draw_func );
+
+	finish=clock();
+	time5=float(finish-start)/CLOCKS_PER_SEC;
+	printf("用opengl显示花费了%lfs\n",time5);
+	//------------------------------------------------------------------------------------------------------------------------------------------
+
+	time=time1+time2+time3+time4+time5;
+	printf("一共花费了%lfs\n",time);
+	glutMainLoop();
+	return 0;
+}

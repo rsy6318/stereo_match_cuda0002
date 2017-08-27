@@ -1,0 +1,6 @@
+10:56:10 **** Incremental Build of configuration Debug for project mul_device ****
+make all 
+make: Nothing to be done for 'all'.
+
+10:56:11 Build Finished (took 135ms)
+

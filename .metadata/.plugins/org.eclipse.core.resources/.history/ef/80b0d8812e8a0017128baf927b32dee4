@@ -1,0 +1,64 @@
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <math.h>
+#include "cuda.h"
+#include "cuda_runtime.h"
+#include "cuda_runtime_api.h"
+#include "device_launch_parameters.h"
+#include "device_functions.h"
+
+#include <helper_gl.h>
+#include <helper_cuda.h>
+#include <helper_cuda_gl.h>
+#include <helper_string.h>
+#include <helper_functions.h>
+#include <GL/freeglut.h>
+#include <vector_types.h>
+#include <driver_functions.h>
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
+#include <GL/glx.h>
+
+using namespace cv;
+using namespace std;
+
+#define uchar unsigned char
+#define uint unsigned int
+
+#define rows 992
+#define cols 1420
+#define disp_max 160
+
+#define block_size_x 32
+#define block_size_y 32
+
+__global__ void kernel(unsigned char *im_0[cols][3],unsigned char *im_1[cols][3],unsigned char *out1[cols][3])
+{
+	const uint x=blockIdx.x*blockDim.x+threadIdx.x;
+	const uint y=blockIdx.y*blockDim.y+threadIdx.y;
+	out1[x][y][0]=(im_0[x][y][0]+im_1[x][y][0])/2;
+	out1[x][y][1]=(im_0[x][y][1]+im_1[x][y][1])/2;
+	out1[x][y][2]=(im_0[x][y][2]+im_1[x][y][2])/2;
+}
+
+int main()
+{
+	Mat im0=imread("im0.png");
+	Mat im1=imread("im1.png");
+	Mat out;
+	//bgr
+	unsigned char *d_data0[cols][3];
+	unsigned char *d_data1[cols][3];
+
+	unsigned char *d_out_bgr[cols][3];
+
+	cudaMalloc((void **)&d_data0,rows*cols*sizeof(unsigned char));
+	cudaMalloc((void **)&d_data1,rows*cols*sizeof(unsigned char));
+	cudaMalloc((void **)&d_out_bgr,rows*cols*sizeof(unsigned char));
+
+
+	return 0;
+}

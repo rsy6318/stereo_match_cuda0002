@@ -1,0 +1,6 @@
+15:35:30 **** Incremental Build of configuration Debug for project bandwidthTest ****
+make all 
+make: Nothing to be done for 'all'.
+
+15:35:30 Build Finished (took 125ms)
+

@@ -1,0 +1,127 @@
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <math.h>
+#include "cuda.h"
+#include "cuda_runtime.h"
+#include "cuda_runtime_api.h"
+#include "device_launch_parameters.h"
+#include "device_functions.h"
+
+#include <helper_gl.h>
+#include <helper_cuda.h>
+#include <helper_cuda_gl.h>
+#include <helper_functions.h>
+#include <GL/freeglut.h>
+#include <vector_types.h>
+#include <driver_functions.h>
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
+#include <GL/glx.h>
+
+using namespace cv;
+using namespace std;
+
+#define uchar unsigned char
+#define uint unsigned int
+
+unsigned int h
+#define rows 948
+unsigned int w
+#define cols 1500
+
+#define rad 9
+#define disp_max 305
+
+texture<unsigned int, cudaTextureType2D, cudaReadModeElementType> tex2Dleft;
+texture<unsigned int, cudaTextureType2D, cudaReadModeElementType> tex2Dright;
+
+
+void load_img(const char *filename,unsigned char **data1,unsigned int ww,unsigned int hh)
+{
+	Mat img=imread(filename);
+	*data1=(unsigned char *)malloc(sizeof(unsigned char)*ww*hh*4);
+	unsigned int size=ww*hh;
+	unsigned char *ptr=*data1;
+	for(int i=0;i<size;i++)
+	{
+		*ptr++=*img.data++;
+		*ptr++=*img.data++;
+		*ptr++=*img.data++;
+		*ptr++=0;
+	}
+}
+
+int iDivUp(int a, int b)
+{
+    return ((a % b) != 0) ? (a / b + 1) : (a / b);
+}
+
+#define block_size_x 32
+#define block_size_y 32
+
+dim3 block_size(block_size_x,block_size_y);
+dim3 grid_size(iDivUp(rows,block_size.x),iDivUp(cols,block_size.y));
+
+__global__ void stereo_kernel(unsigned int *img0,unsigned int *img1,unsigned int *out)
+{
+	unsigned int x=blockDim.x*blockIdx.x+threadIdx.x;
+	unsigned int y=blockDim.y*blockIdx.y+threadIdx.y;
+
+	__shared__ unsigned int sh_data[block_size_x+2*rad][block_size_y+2*rad];
+
+
+}
+
+
+int main(int argc,char **argv)
+{
+	cudaDeviceProp deviceProp;
+	deviceProp.major = 0;
+	deviceProp.minor = 0;
+	int dev = 0;
+
+	// This will pick the best possible CUDA capable device
+	dev = findCudaDevice(argc, (const char **)argv);
+
+	checkCudaErrors(cudaGetDeviceProperties(&deviceProp, dev));
+
+	// Statistics about the GPU device
+	printf("> GPU device has %d Multi-Processors, SM %d.%d compute capabilities\n\n", deviceProp.multiProcessorCount, deviceProp.major, deviceProp.minor);
+
+	unsigned char *data0;
+	unsigned char *data1;
+	load_img("im0.png",&data0,cols,rows);
+	load_img("im1.png",&data1,cols,rows);
+
+	h=948;
+	w=1500
+
+	unsigned int *d_data0,*d_data1,*d_out;
+	cudaMalloc((void **)&d_data0,rows*cols*sizeof(unsigned int));
+	cudaMalloc((void **)&d_data1,rows*cols*sizeof(unsigned int));
+	cudaMalloc((void **)&d_out,rows*cols*sizeof(unsigned int));
+
+	cudaMemcpy(d_data0,data0,rows*cols*sizeof(unsigned int),cudaMemcpyHostToDevice);
+	cudaMemcpy(d_data1,data1,rows*cols*sizeof(unsigned int),cudaMemcpyHostToDevice);
+
+	size_t offset=0;
+	cudaChannelFormatDesc ca_desc0=cudaCreateChannelDesc<unsigned int>();
+	cudaChannelFormatDesc ca_desc1=cudaCreateChannelDesc<unsigned int>();
+
+	tex2Dleft.addressMode[0]=cudaAddressModeClamp;
+	tex2Dleft.addressMode[1]=cudaAddressModeClamp;
+	tex2Dleft.filterMode=cudaFilterModePoint;
+	tex2Dleft.normalized=false;
+	tex2Dright.addressMode[0]=cudaAddressModeClamp;
+	tex2Dright.addressMode[1]=cudaAddressModeClamp;
+	tex2Dright.filterMode=cudaFilterModePoint;
+	tex2Dright.normalized=false;
+
+	checkCudaErrors(cudaBindTexture2D(&offset,tex2Dleft,d_data0,ca_desc0,h,w,h*4));
+	assert(offset=0);
+
+	return 0;
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.eclipse.cdt.launch.applicationLaunchType">
+<booleanAttribute key="nvvp.apiTraceProfiling" value="true"/>
+<booleanAttribute key="nvvp.appReplay" value="false"/>
+<intAttribute key="nvvp.cdpbuffersize" value="8"/>
+<booleanAttribute key="nvvp.concurrentProfiling" value="true"/>
+<intAttribute key="nvvp.devicebuffersize" value="8"/>
+<booleanAttribute key="nvvp.environmentProfiling" value="false"/>
+<stringAttribute key="nvvp.filename" value="/home/rsy6318/cuda-workspace/.metadata/.plugins/com.nvidia.viper.ide/aa13131 Debug.nvvp"/>
+<intAttribute key="nvvp.multiProcess" value="0"/>
+<booleanAttribute key="nvvp.openaccProfiling" value="true"/>
+<booleanAttribute key="nvvp.startProfiling" value="true"/>
+<booleanAttribute key="nvvp.threadTracking" value="false"/>
+<intAttribute key="nvvp.timeout" value="-1"/>
+<booleanAttribute key="nvvp.uvmProfiling" value="false"/>
+<intAttribute key="org.eclipse.cdt.launch.ATTR_BUILD_BEFORE_LAUNCH_ATTR" value="2"/>
+<stringAttribute key="org.eclipse.cdt.launch.COREFILE_PATH" value=""/>
+<stringAttribute key="org.eclipse.cdt.launch.PROGRAM_NAME" value="Debug/aa13131"/>
+<stringAttribute key="org.eclipse.cdt.launch.PROJECT_ATTR" value="aa13131"/>
+<booleanAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_AUTO_ATTR" value="true"/>
+<stringAttribute key="org.eclipse.cdt.launch.PROJECT_BUILD_CONFIG_ID_ATTR" value="com.nvidia.cuda.ide.eight_zero.configuration.debug.802991341"/>
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_PATHS">
+<listEntry value="/aa13131"/>
+</listAttribute>
+<listAttribute key="org.eclipse.debug.core.MAPPED_RESOURCE_TYPES">
+<listEntry value="4"/>
+</listAttribute>
+</launchConfiguration>

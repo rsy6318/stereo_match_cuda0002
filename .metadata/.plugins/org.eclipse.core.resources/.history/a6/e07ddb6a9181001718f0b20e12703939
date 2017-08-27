@@ -1,0 +1,34 @@
+#include <stdio.h>
+#include <cuda_runtime.h>
+
+bool initCUDA()
+{
+	int count;
+
+	cudaGetDeviceCount(&count);
+	if(count==0)
+	{
+		fprintf(stderr,"there is not device\n");
+		return 0;
+	}
+	int i;
+	for(i=0;i<count;i++)
+	{
+		cudaDeviceProp prop;
+		if(cudaGetDeviceProperties(&prop,i)==cudaSuccess)
+		{
+			if(prop.major>=1)
+			{
+				break;
+			}
+		}
+	}
+
+
+	if(i==count)
+	{
+		fprintf(stderr,"there is no device supporting CUDA 1.x\n");
+		return 0;
+	}
+	cudaSetDevice(i);
+}

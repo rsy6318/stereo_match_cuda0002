@@ -1,0 +1,64 @@
+11:18:58 **** Incremental Build of configuration Release for project stereo ****
+make all 
+Building file: ../src/stereoDisparity.cu
+Invoking: NVCC Compiler
+/usr/local/cuda-8.0/bin/nvcc -I"/usr/local/cuda-8.0/samples/3_Imaging" -I/home/rsy6318/opencv-3.0.0/include/opencv -I/home/rsy6318/opencv-3.0.0/include/opencv2 -I"/usr/local/cuda-8.0/samples/common/inc" -I"/home/rsy6318/cuda-workspace/stereo" -O3 -gencode arch=compute_30,code=sm_30  -odir "src" -M -o "src/stereoDisparity.d" "../src/stereoDisparity.cu"
+/usr/local/cuda-8.0/bin/nvcc -I"/usr/local/cuda-8.0/samples/3_Imaging" -I/home/rsy6318/opencv-3.0.0/include/opencv -I/home/rsy6318/opencv-3.0.0/include/opencv2 -I"/usr/local/cuda-8.0/samples/common/inc" -I"/home/rsy6318/cuda-workspace/stereo" -O3 --compile --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30  -x cu -o  "src/stereoDisparity.o" "../src/stereoDisparity.cu"
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(135): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+../src/stereoDisparity.cu(136): warning: unrecognized character escape sequence
+
+Finished building: ../src/stereoDisparity.cu
+ 
+Building target: stereo
+Invoking: NVCC Linker
+/usr/local/cuda-8.0/bin/nvcc --cudart static -L/home/rsy6318/opencv-3.0.0/lib --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30 -link -o  "stereo"  ./src/stereoDisparity.o   -lopencv_ml -lopencv_imgproc -lopencv_highgui -lopencv_core -lopencv_videoio -lopencv_imgcodecs
+Finished building target: stereo
+ 
+
+11:19:02 Build Finished (took 4s.406ms)
+

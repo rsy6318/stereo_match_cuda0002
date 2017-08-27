@@ -1,0 +1,6 @@
+15:51:21 **** Incremental Build of configuration Debug for project matrixMul ****
+make all 
+make: Nothing to be done for 'all'.
+
+15:51:21 Build Finished (took 126ms)
+

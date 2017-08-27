@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<session version="2" name="stereo.nvvp" hscale="1.0E-6" normalize="false">
+<timelineoptions enabletimerange="false" start="-1" end="-1" numsegmentsuvm="100" uvmisegmentenabled="true"/>
+<executable file="/home/rsy6318/cuda-workspace/stereo/Debug/stereo" cwd="/home/rsy6318/cuda-workspace/stereo" args="" launchConfiguration="stereo" profileonstart="true" concurrentkernels="true" apitrace="true" environmentprofiling="false" uvmprofiling="false" openaccprofiling="true" threadtracking="false" devicebuffersize="8" cdpbuffersize="8"><envs></envs><multiProcess type="0" rumMPS="false"/></executable>
+<expert><columnprops></columnprops>
+</expert>
+<analysis guided="true"></analysis>
+<expertsystem current="INTRO"><visited><stage name="INTRO"/></visited></expertsystem>
+<vruler width="200"/>
+<hruler>
+</hruler>
+</session>

@@ -1,0 +1,77 @@
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#include <iostream>
+#include <stdio.h>
+#include <ctime>
+#include<opencv2/opencv.hpp>
+#define uint unsigned int
+#define uchar unsigned char
+using namespace std;
+using namespace cv;
+#define block_size_x 32
+#define block_size_y 32
+
+#define rows 288
+#define cols 384
+__global__ void picture_add(uchar (*a)[cols],uchar (*b)[cols],uchar(*c)[cols])
+{
+	unsigned int idx=(blockIdx.x*blockDim.x)+threadIdx.x;
+	unsigned int idy=(blockIdx.y*blockDim.y)+threadIdx.y;
+	c[idx][idy]=(a[idx][idy]+b[idx][idy])/2.0;
+}
+int iDivUp(int a, int b)
+{
+    return ((a % b) != 0) ? (a / b + 1) : (a / b);
+}
+
+int main()
+{
+	dim3 threads(block_size_x,block_size_y);
+	dim3 blocks(iDivUp(rows,block_size_x),iDivUp(cols,block_size_y));
+	uchar p1[rows][cols];
+	uchar p2[rows][cols];
+	uchar (*gpu_p1)[cols];
+	uchar (*gpu_p2)[cols];
+	uchar (*gpu_p3)[cols];
+
+	Mat im1,im2,im1_gray,im2_gray,im3;
+	im3.create(rows,cols,CV_8UC1);
+	im1=imread("im2.ppm");
+	im2=imread("im6.ppm");
+
+	cvtColor(im1,im1_gray,COLOR_BGR2GRAY);
+	cvtColor(im2,im2_gray,COLOR_BGR2GRAY);
+	for(int x=0;x<rows;x++)
+	{
+		for(int y=0;y<cols;y++)
+		{
+			p1[x][y]=im1_gray.at<uchar>(x,y);
+			p2[x][y]=im2_gray.at<uchar>(x,y);
+		}
+	}
+	cudaMalloc((void **)&gpu_p1,rows*cols*sizeof(uchar));             //将gpu_a从CPU上的变量转变为GPU上的变量
+	cudaMalloc((void **)&gpu_p2,rows*cols*sizeof(uchar));				//将gpu_b从CPU上的变量转变为GPU上的变量
+	cudaMalloc((void **)&gpu_p3,rows*cols*sizeof(uchar));				//将gpu_c从CPU上的变量转变为GPU上的变量
+
+	cudaMemcpy(gpu_p1,im1_gray.data,rows*cols*sizeof(uchar),cudaMemcpyHostToDevice);         //将CPU上a的值赋给GPU上的gpu_a
+	cudaMemcpy(gpu_p2,im2_gray.data,rows*cols*sizeof(uchar),cudaMemcpyHostToDevice);			//将CPU上b的值赋给GPU上的gpu_b
+
+	picture_add<<<blocks,threads>>>(gpu_p1,gpu_p2,gpu_p3);
+
+	cudaMemcpy(im3.data,gpu_p3,rows*cols*sizeof(uchar),cudaMemcpyDeviceToHost);
+//im3=(im1_gray+im2_gray)/2;
+	for(int x=0;x<rows;x++)
+	{
+		for(int y=0;y<cols;y++)
+		{
+			//im3.at<uchar>(x,y)=p3[x][y];
+		}
+	}
+	cudaFree(gpu_p1);
+	cudaFree(gpu_p2);
+	cudaFree(gpu_p3);
+	imshow("   ",im3);
+	waitKey(0);
+
+	return 0;
+}

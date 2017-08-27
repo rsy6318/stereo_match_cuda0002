@@ -1,0 +1,105 @@
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <math.h>
+#include "cuda.h"
+#include "cuda_runtime.h"
+#include "cuda_runtime_api.h"
+#include "device_launch_parameters.h"
+#include "device_functions.h"
+
+#include <helper_gl.h>
+#include <helper_cuda.h>
+#include <helper_cuda_gl.h>
+#include <helper_functions.h>
+#include <GL/freeglut.h>
+#include <vector_types.h>
+#include <driver_functions.h>
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
+#include <GL/glx.h>
+
+using namespace cv;
+using namespace std;
+
+#define uchar unsigned char
+#define uint unsigned int
+
+#define h 948
+#define rows 948
+#define w 1500
+#define cols 1500
+
+#define disp_max 305
+
+texture<unsigned int, cudaTextureType2D, cudaReadModeElementType> tex2Dleft;
+texture<unsigned int, cudaTextureType2D, cudaReadModeElementType> tex2Dright;
+
+
+void load_img(const char *filename,unsigned char **data1,unsigned int ww,unsigned int hh)
+{
+	Mat img=imread(filename);
+	*data1=(unsigned char *)malloc(sizeof(unsigned char)*ww*hh*4);
+	unsigned int size=ww*hh;
+	unsigned char *ptr=*data1;
+	for(int i=0;i<size;i++)
+	{
+		*ptr++=*img.data++;
+		*ptr++=*img.data++;
+		*ptr++=*img.data++;
+		*ptr++=0;
+	}
+}
+
+int iDivUp(int a, int b)
+{
+    return ((a % b) != 0) ? (a / b + 1) : (a / b);
+}
+
+dim3 block_size(32,32);
+dim3 grid_size(iDivUp(rows,block_size.x),iDivUp(cols,block_size.y));
+
+__global__ void stereo_kernel(unsigned int *img0,unsigned int *img1,int rad,unsigned int *out)
+{
+	unsigned int x=blockDim.x*blockIdx.x+threadIdx.x;
+	unsigned int y=blockDim.y*blockIdx.y+threadIdx.y;
+
+	__shared__ unsigned int sh_mem[block_size.x+2*rad][block_size.y+2*rad];
+
+
+}
+
+
+int main(int argc,char **argv)
+{
+	cudaDeviceProp deviceProp;
+	deviceProp.major = 0;
+	deviceProp.minor = 0;
+	int dev = 0;
+
+	// This will pick the best possible CUDA capable device
+	dev = findCudaDevice(argc, (const char **)argv);
+
+	checkCudaErrors(cudaGetDeviceProperties(&deviceProp, dev));
+
+	// Statistics about the GPU device
+	printf("> GPU device has %d Multi-Processors, SM %d.%d compute capabilities\n\n", deviceProp.multiProcessorCount, deviceProp.major, deviceProp.minor);
+
+	unsigned char *data0;
+	unsigned char *data1;
+	load_img("im0.png",&data0,cols,rows);
+	load_img("im1.png",&data1,cols,rows);
+
+	unsigned int *d_data0,*d_data1,*d_out;
+	cudaMalloc((void **)&d_data0,rows*cols*sizeof(unsigned int));
+	cudaMalloc((void **)&d_data1,rows*cols*sizeof(unsigned int));
+	cudaMalloc((void **)&d_out,rows*cols*sizeof(unsigned int));
+
+	cudaMemcpy(d_data0,data0,rows*cols*sizeof(unsigned int),cudaMemcpyHostToDevice);
+	cudaMemcpy(d_data1,data1,rows*cols*sizeof(unsigned int),cudaMemcpyHostToDevice);
+
+
+	return 0;
+}
