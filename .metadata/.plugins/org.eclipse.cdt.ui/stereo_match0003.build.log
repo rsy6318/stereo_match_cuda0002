@@ -1,7 +1,7 @@
-19:48:48 **** Clean-only build of configuration Release for project stereo_match0003 ****
+09:16:36 **** Clean-only build of configuration Release for project stereo_match0003 ****
 make clean 
 rm -rf  ./main.d  ./main.o  stereo_match0003
  
 
-19:48:49 Build Finished (took 129ms)
+09:16:36 Build Finished (took 188ms)
 

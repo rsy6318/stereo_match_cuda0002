@@ -32,6 +32,10 @@ using namespace cv;
 #define cols 1420
 #define disp_max 160
 
+#define step 1
+
+uchar (*temp)[cols];
+
 int iDivUp(int a, int b)
 {
     return ((a % b) != 0) ? (a / b + 1) : (a / b);
@@ -50,7 +54,7 @@ __global__ void stereo_kernel(uint (*a)[cols],uint (*b)[cols],uchar (*disp)[cols
 		disp[x][y]=0;
 		uint cost=abs((float)(a[x][y]-b[x][y]));
 		uint cost_now;
-		for(int d=1;d<disp_max+1;d++)
+		for(int d=1;d<disp_max+1;d+=step)
 		{
 			cost_now=abs((float)(a[x][y]-b[x][y-d]));
 			if(cost>cost_now)
@@ -60,6 +64,48 @@ __global__ void stereo_kernel(uint (*a)[cols],uint (*b)[cols],uchar (*disp)[cols
 			}
 		}
 	}
+}
+
+__global__ void box_x(uchar (*input)[cols],uchar (*output)[cols],int win_radius)
+{
+	const uint idx= (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	uint scale=(win_radius<<1)+1;
+	if ((idx >= win_radius) && (idx < rows - 1 - win_radius) && (idy >= win_radius) && (idy < cols - 1 - win_radius))
+	{
+		uint sum=0;
+		for (int x = idx-win_radius; x <idx+win_radius+1 ; x++)
+		{
+			sum += input[x][idy];
+		}
+		output[idx][idy]=sum/scale;
+	}
+	else
+		output[idx][idy]=input[idx][idy];
+}
+
+__global__ void box_y(uchar (*input)[cols],uchar (*output)[cols],int win_radius)
+{
+	const uint idx= (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
+	uint scale=(win_radius<<1)+1;
+	if ((idx >= win_radius) && (idx < rows - 1 - win_radius) && (idy >= win_radius) && (idy < cols - 1 - win_radius))
+	{
+		uint sum=0;
+		for (int y = idy-win_radius; y <idy+win_radius+1 ; y++)
+		{
+			sum += input[idx][y];
+		}
+		output[idx][idy]=sum/scale;
+	}
+	else
+		output[idx][idy]=input[idx][idy];
+}
+
+void box_filter(uchar (*input)[cols],uchar (*output)[cols],int win_radius,dim3 grid_size,dim3 block_size)
+{
+	box_x<<<grid_size,block_size>>>(input,temp,win_radius);
+	box_y<<<grid_size,block_size>>>(temp,output,win_radius);
 }
 
 int main()
@@ -72,12 +118,15 @@ int main()
 	uint (*gpu_p1)[cols];
 	uint (*gpu_p2)[cols];
 	uchar (*gpu_p3)[cols];
+	uchar (*gpu_p4)[cols];
 
 
 	Mat im1,im2,im3;
 	im3.create(rows,cols,CV_8UC1);
 	im1=imread("im0.png");
 	im2=imread("im1.png");
+
+	imshow("左图",im1);
 
 	cout<<1<<endl;
 
@@ -101,6 +150,8 @@ int main()
 	cudaMalloc((void **)&gpu_p1,rows*cols*sizeof(uint));
 	cudaMalloc((void **)&gpu_p2,rows*cols*sizeof(uint));
 	cudaMalloc((void **)&gpu_p3,rows*cols*sizeof(uchar));
+	cudaMalloc((void **)&gpu_p4,rows*cols*sizeof(uchar));
+	cudaMalloc((void **)&temp,rows*cols*sizeof(uchar));
 
 	cudaMemcpyAsync(gpu_p1,cpu_p1,rows*cols*sizeof(uint),cudaMemcpyHostToDevice);
 	cudaMemcpyAsync(gpu_p2,cpu_p2,rows*cols*sizeof(uint),cudaMemcpyHostToDevice);
@@ -111,10 +162,15 @@ int main()
 
 	stereo_kernel<<<blocks,threads>>>(gpu_p1,gpu_p2,gpu_p3);
 
-	cudaMemcpy(im3.data,gpu_p3,rows*cols*sizeof(uchar),cudaMemcpyDeviceToHost);
+	box_filter(gpu_p3,gpu_p4,1,blocks,threads);
 
-	imshow("   ",im3);
-	waitKey(10);
+	cudaMemcpy(im3.data,gpu_p4,rows*cols*sizeof(uchar),cudaMemcpyDeviceToHost);
+
+	//medianBlur(im3,im3,3);
+	//blur(im3,im3,Size(3,3),Point(-1,-1));
+	imshow("视差图",im3);
+	imwrite("disp.bmp",im3);
+	//waitKey(0);
 
 	return 0;
 }
