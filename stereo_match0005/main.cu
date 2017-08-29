@@ -28,7 +28,7 @@ using namespace cv;
 #define block_size_x 2
 #define block_size_y 64
 
-#define rows 992   //948*1500
+#define rows 992   //948*1500  992 1420
 #define cols 1420
 #define disp_max 160
 
@@ -51,6 +51,7 @@ __global__ void stereo_kernel(uint (*a)[cols],uint (*b)[cols],uchar (*disp)[cols
 	}
 	else
 	{
+		uchar d_now=0;
 		disp[x][y]=0;
 		uint cost=abs((float)(a[x][y]-b[x][y]));
 		uint cost_now;
@@ -59,10 +60,14 @@ __global__ void stereo_kernel(uint (*a)[cols],uint (*b)[cols],uchar (*disp)[cols
 			cost_now=abs((float)(a[x][y]-b[x][y-d]));
 			if(cost>cost_now)
 			{
-				disp[x][y]=d;
+				d_now=d;
 				cost=cost_now;
 			}
 		}
+		//if(cost<100000)
+			disp[x][y]=d_now;
+		//else
+			//disp[x][y]=0;
 	}
 }
 
@@ -86,7 +91,7 @@ __global__ void box_x(uchar (*input)[cols],uchar (*output)[cols],int win_radius)
 
 __global__ void box_y(uchar (*input)[cols],uchar (*output)[cols],int win_radius)
 {
-	const uint idx= (blockIdx.x*blockDim.x) + threadIdx.x;
+	const uint idx = (blockIdx.x*blockDim.x) + threadIdx.x;
 	const uint idy = (blockIdx.y*blockDim.y) + threadIdx.y;
 	uint scale=(win_radius<<1)+1;
 	if ((idx >= win_radius) && (idx < rows - 1 - win_radius) && (idy >= win_radius) && (idy < cols - 1 - win_radius))
@@ -128,7 +133,7 @@ int main()
 
 	imshow("左图",im1);
 
-	cout<<1<<endl;
+	//cout<<1<<endl;
 
 	cudaHostAlloc( (void**)&cpu_p1,rows*cols*sizeof(uint),cudaHostAllocDefault);
 	cudaHostAlloc( (void**)&cpu_p2,rows*cols*sizeof(uint),cudaHostAllocDefault);
@@ -162,15 +167,15 @@ int main()
 
 	stereo_kernel<<<blocks,threads>>>(gpu_p1,gpu_p2,gpu_p3);
 
-	box_filter(gpu_p3,gpu_p4,1,blocks,threads);
+	box_filter(gpu_p3,gpu_p4,2,blocks,threads);
 
 	cudaMemcpy(im3.data,gpu_p4,rows*cols*sizeof(uchar),cudaMemcpyDeviceToHost);
 
 	//medianBlur(im3,im3,3);
 	//blur(im3,im3,Size(3,3),Point(-1,-1));
 	imshow("视差图",im3);
-	imwrite("disp.bmp",im3);
-	//waitKey(0);
+	imwrite("disp1.bmp",im3);
+	waitKey(0);
 
 	return 0;
 }
