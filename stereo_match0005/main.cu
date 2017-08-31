@@ -62,6 +62,8 @@ __global__ void stereo_kernel(uint (*a)[cols],uint (*b)[cols],uchar (*disp)[cols
 			{
 				d_now=d;
 				cost=cost_now;
+				if(cost==0)
+					break;
 			}
 		}
 		//if(cost<100000)
@@ -150,8 +152,6 @@ int main()
 		}
 	}
 
-
-
 	cudaMalloc((void **)&gpu_p1,rows*cols*sizeof(uint));
 	cudaMalloc((void **)&gpu_p2,rows*cols*sizeof(uint));
 	cudaMalloc((void **)&gpu_p3,rows*cols*sizeof(uchar));
@@ -167,7 +167,7 @@ int main()
 
 	stereo_kernel<<<blocks,threads>>>(gpu_p1,gpu_p2,gpu_p3);
 
-	box_filter(gpu_p3,gpu_p4,2,blocks,threads);
+	box_filter(gpu_p3,gpu_p4,1,blocks,threads);
 
 	cudaMemcpy(im3.data,gpu_p4,rows*cols*sizeof(uchar),cudaMemcpyDeviceToHost);
 
