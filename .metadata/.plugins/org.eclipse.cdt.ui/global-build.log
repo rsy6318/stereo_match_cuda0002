@@ -1,4 +1,8 @@
-22:05:22 **** Build of configuration Release for project stereo_match0006 ****
+15:02:50 **** Clean-only build of configuration Release for project stereo_match0006 ****
+make clean 
+rm -rf  ./main.d  ./main.o  stereo_match0006
+ 
+15:02:53 **** Build of configuration Release for project stereo_match0006 ****
 make all 
 Building file: ../main.cu
 Invoking: NVCC Compiler
@@ -11,27 +15,7 @@ Invoking: NVCC Linker
 /usr/local/cuda-8.0/bin/nvcc --cudart static -L/home/rsy6318/opencv-3.0.0/lib -L"/usr/local/cuda-8.0/samples/common/lib/linux/x86_64" -lGL -lGLU -lglut  --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30 -link -o  "stereo_match0006"  ./main.o  /usr/local/cuda-8.0/samples/common/lib/linux/x86_64/libGLEW.a -lopencv_ml -lopencv_imgproc -lopencv_highgui -lopencv_core -lopencv_videoio -lopencv_imgcodecs
 Finished building target: stereo_match0006
  
-22:05:31 **** Incremental Build of configuration Release for project stereo_match0006 ****
-make all 
-make: Nothing to be done for 'all'.
-22:07:20 **** Incremental Build of configuration Release for project stereo_match0006 ****
-make all 
-Building file: ../main.cu
-Invoking: NVCC Compiler
-/usr/local/cuda-8.0/bin/nvcc -I/home/rsy6318/opencv-3.0.0/include/opencv -I"/usr/local/cuda-8.0/samples/common/inc" -I/home/rsy6318/opencv-3.0.0/include/opencv2 -O3 -gencode arch=compute_30,code=sm_30  -odir "." -M -o "main.d" "../main.cu"
-/usr/local/cuda-8.0/bin/nvcc -I/home/rsy6318/opencv-3.0.0/include/opencv -I"/usr/local/cuda-8.0/samples/common/inc" -I/home/rsy6318/opencv-3.0.0/include/opencv2 -O3 --compile --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30  -x cu -o  "main.o" "../main.cu"
-../main.cu(76): warning: variable "sh_right" was set but never used
-
-../main.cu(76): warning: variable "sh_right" was set but never used
-
-Finished building: ../main.cu
- 
-Building target: stereo_match0006
-Invoking: NVCC Linker
-/usr/local/cuda-8.0/bin/nvcc --cudart static -L/home/rsy6318/opencv-3.0.0/lib -L"/usr/local/cuda-8.0/samples/common/lib/linux/x86_64" -lGL -lGLU -lglut  --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30 -link -o  "stereo_match0006"  ./main.o  /usr/local/cuda-8.0/samples/common/lib/linux/x86_64/libGLEW.a -lopencv_ml -lopencv_imgproc -lopencv_highgui -lopencv_core -lopencv_videoio -lopencv_imgcodecs
-Finished building target: stereo_match0006
- 
-22:07:44 **** Incremental Build of configuration Release for project stereo_match0006 ****
+16:17:15 **** Incremental Build of configuration Release for project stereo_match0006 ****
 make all 
 Building file: ../main.cu
 Invoking: NVCC Compiler
@@ -44,7 +28,7 @@ Invoking: NVCC Linker
 /usr/local/cuda-8.0/bin/nvcc --cudart static -L/home/rsy6318/opencv-3.0.0/lib -L"/usr/local/cuda-8.0/samples/common/lib/linux/x86_64" -lGL -lGLU -lglut  --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30 -link -o  "stereo_match0006"  ./main.o  /usr/local/cuda-8.0/samples/common/lib/linux/x86_64/libGLEW.a -lopencv_ml -lopencv_imgproc -lopencv_highgui -lopencv_core -lopencv_videoio -lopencv_imgcodecs
 Finished building target: stereo_match0006
  
-22:08:04 **** Incremental Build of configuration Release for project stereo_match0006 ****
+16:17:32 **** Incremental Build of configuration Release for project stereo_match0006 ****
 make all 
 Building file: ../main.cu
 Invoking: NVCC Compiler
@@ -57,37 +41,7 @@ Invoking: NVCC Linker
 /usr/local/cuda-8.0/bin/nvcc --cudart static -L/home/rsy6318/opencv-3.0.0/lib -L"/usr/local/cuda-8.0/samples/common/lib/linux/x86_64" -lGL -lGLU -lglut  --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30 -link -o  "stereo_match0006"  ./main.o  /usr/local/cuda-8.0/samples/common/lib/linux/x86_64/libGLEW.a -lopencv_ml -lopencv_imgproc -lopencv_highgui -lopencv_core -lopencv_videoio -lopencv_imgcodecs
 Finished building target: stereo_match0006
  
-22:08:14 **** Incremental Build of configuration Release for project stereo_match0006 ****
-make all 
-make: Nothing to be done for 'all'.
-22:08:15 **** Incremental Build of configuration Release for project stereo_match0006 ****
-make all 
-make: Nothing to be done for 'all'.
-22:08:30 **** Incremental Build of configuration Release for project stereo_match0006 ****
-make all 
-make: Nothing to be done for 'all'.
-22:08:31 **** Incremental Build of configuration Release for project stereo_match0006 ****
-make all 
-make: Nothing to be done for 'all'.
-22:09:06 **** Incremental Build of configuration Release for project stereo_match0006 ****
-make all 
-make: Nothing to be done for 'all'.
-22:09:07 **** Incremental Build of configuration Release for project stereo_match0006 ****
-make all 
-make: Nothing to be done for 'all'.
-22:40:39 **** Build of configuration Release for project stereo_match0006 ****
-make all 
-make: Nothing to be done for 'all'.
-22:40:47 **** Incremental Build of configuration Release for project stereo_match0006 ****
-make all 
-make: Nothing to be done for 'all'.
-22:40:49 **** Incremental Build of configuration Release for project stereo_match0006 ****
-make all 
-make: Nothing to be done for 'all'.
-22:41:06 **** Incremental Build of configuration Release for project stereo_match0006 ****
-make all 
-make: Nothing to be done for 'all'.
-22:41:57 **** Incremental Build of configuration Release for project stereo_match0006 ****
+16:27:22 **** Incremental Build of configuration Release for project stereo_match0006 ****
 make all 
 Building file: ../main.cu
 Invoking: NVCC Compiler
@@ -100,22 +54,13 @@ Invoking: NVCC Linker
 /usr/local/cuda-8.0/bin/nvcc --cudart static -L/home/rsy6318/opencv-3.0.0/lib -L"/usr/local/cuda-8.0/samples/common/lib/linux/x86_64" -lGL -lGLU -lglut  --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30 -link -o  "stereo_match0006"  ./main.o  /usr/local/cuda-8.0/samples/common/lib/linux/x86_64/libGLEW.a -lopencv_ml -lopencv_imgproc -lopencv_highgui -lopencv_core -lopencv_videoio -lopencv_imgcodecs
 Finished building target: stereo_match0006
  
-22:42:14 **** Incremental Build of configuration Release for project stereo_match0006 ****
+16:27:41 **** Incremental Build of configuration Release for project stereo_match0006 ****
 make all 
 make: Nothing to be done for 'all'.
-00:21:39 **** Build of configuration Release for project stereo_match0006 ****
+16:27:42 **** Incremental Build of configuration Release for project stereo_match0006 ****
 make all 
-Building file: ../main.cu
-Invoking: NVCC Compiler
-/usr/local/cuda-8.0/bin/nvcc -I/home/rsy6318/opencv-3.0.0/include/opencv -I"/usr/local/cuda-8.0/samples/common/inc" -I/home/rsy6318/opencv-3.0.0/include/opencv2 -O3 -gencode arch=compute_30,code=sm_30  -odir "." -M -o "main.d" "../main.cu"
-/usr/local/cuda-8.0/bin/nvcc -I/home/rsy6318/opencv-3.0.0/include/opencv -I"/usr/local/cuda-8.0/samples/common/inc" -I/home/rsy6318/opencv-3.0.0/include/opencv2 -O3 --compile --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30  -x cu -o  "main.o" "../main.cu"
-../main.cu(200): error: no instance of overloaded function "cudaMallocPitch" matches the argument list
-            argument types are: (unsigned int (*)[1420], size_t *, unsigned long, int)
-
-1 error detected in the compilation of "/tmp/tmpxft_00000c93_00000000-7_main.cpp1.ii".
-subdir.mk:18: recipe for target 'main.o' failed
-make: *** [main.o] Error 2
-00:22:14 **** Incremental Build of configuration Release for project stereo_match0006 ****
+make: Nothing to be done for 'all'.
+16:28:28 **** Incremental Build of configuration Release for project stereo_match0006 ****
 make all 
 Building file: ../main.cu
 Invoking: NVCC Compiler
@@ -128,7 +73,10 @@ Invoking: NVCC Linker
 /usr/local/cuda-8.0/bin/nvcc --cudart static -L/home/rsy6318/opencv-3.0.0/lib -L"/usr/local/cuda-8.0/samples/common/lib/linux/x86_64" -lGL -lGLU -lglut  --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30 -link -o  "stereo_match0006"  ./main.o  /usr/local/cuda-8.0/samples/common/lib/linux/x86_64/libGLEW.a -lopencv_ml -lopencv_imgproc -lopencv_highgui -lopencv_core -lopencv_videoio -lopencv_imgcodecs
 Finished building target: stereo_match0006
  
-00:42:09 **** Incremental Build of configuration Release for project stereo_match0006 ****
+16:28:32 **** Incremental Build of configuration Release for project stereo_match0006 ****
+make all 
+make: Nothing to be done for 'all'.
+16:31:51 **** Incremental Build of configuration Release for project stereo_match0006 ****
 make all 
 Building file: ../main.cu
 Invoking: NVCC Compiler
@@ -141,6 +89,19 @@ Invoking: NVCC Linker
 /usr/local/cuda-8.0/bin/nvcc --cudart static -L/home/rsy6318/opencv-3.0.0/lib -L"/usr/local/cuda-8.0/samples/common/lib/linux/x86_64" -lGL -lGLU -lglut  --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30 -link -o  "stereo_match0006"  ./main.o  /usr/local/cuda-8.0/samples/common/lib/linux/x86_64/libGLEW.a -lopencv_ml -lopencv_imgproc -lopencv_highgui -lopencv_core -lopencv_videoio -lopencv_imgcodecs
 Finished building target: stereo_match0006
  
-00:42:13 **** Incremental Build of configuration Release for project stereo_match0006 ****
+16:33:51 **** Incremental Build of configuration Release for project stereo_match0006 ****
+make all 
+Building file: ../main.cu
+Invoking: NVCC Compiler
+/usr/local/cuda-8.0/bin/nvcc -I/home/rsy6318/opencv-3.0.0/include/opencv -I"/usr/local/cuda-8.0/samples/common/inc" -I/home/rsy6318/opencv-3.0.0/include/opencv2 -O3 -gencode arch=compute_30,code=sm_30  -odir "." -M -o "main.d" "../main.cu"
+/usr/local/cuda-8.0/bin/nvcc -I/home/rsy6318/opencv-3.0.0/include/opencv -I"/usr/local/cuda-8.0/samples/common/inc" -I/home/rsy6318/opencv-3.0.0/include/opencv2 -O3 --compile --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30  -x cu -o  "main.o" "../main.cu"
+Finished building: ../main.cu
+ 
+Building target: stereo_match0006
+Invoking: NVCC Linker
+/usr/local/cuda-8.0/bin/nvcc --cudart static -L/home/rsy6318/opencv-3.0.0/lib -L"/usr/local/cuda-8.0/samples/common/lib/linux/x86_64" -lGL -lGLU -lglut  --relocatable-device-code=false -gencode arch=compute_30,code=compute_30 -gencode arch=compute_30,code=sm_30 -link -o  "stereo_match0006"  ./main.o  /usr/local/cuda-8.0/samples/common/lib/linux/x86_64/libGLEW.a -lopencv_ml -lopencv_imgproc -lopencv_highgui -lopencv_core -lopencv_videoio -lopencv_imgcodecs
+Finished building target: stereo_match0006
+ 
+16:33:55 **** Incremental Build of configuration Release for project stereo_match0006 ****
 make all 
 make: Nothing to be done for 'all'.

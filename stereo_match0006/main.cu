@@ -1,3 +1,24 @@
+﻿
+//                         _ooOoo_
+//                        o8888888o
+//                        88" . "88
+//                        (| -_- |)
+//                        O\  =  /O
+//                     ____/'---'\____
+//                   .'  \\|     |//  '.
+//                  /  \\|||  :  |||//  \
+//                 /  _||||| -:- |||||-  \
+//                 |   | \\\  _  /// |   |
+//                 | \_|  ''\---/''  |   |
+//                 \  .-\__  '_'  ___/-. /
+//               ___`. .'  /--.--\  '. . __
+//            ."" '<  `.___\_<|>_/___.'  >'"".
+//           | | :  `- \`.;`\ _ /`;.`/ - ` : | |
+//           \  \ `-.   \_ __\ /__ _/   .-`  / /
+// ===========`-.____`-.___\_____/___.-`_____.-`================
+//                          `=---='
+// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+// =============================================================
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <stdio.h>
@@ -42,33 +63,7 @@ int iDivUp(int a, int b)
 }
 
 /*
-__global__ void stereo_kernel(uint (*a)[cols],uint (*b)[cols],uchar (*disp)[cols])
-{
-	const uint x=(blockIdx.x*blockDim.x)+threadIdx.x;
-	const uint y=(blockIdx.y*blockDim.y)+threadIdx.y;
-	if(y<disp_max)
-	{
-		disp[x][y]=0;
-	}
-	else
-	{
-		disp[x][y]=0;
-		uint cost=abs((float)(a[x][y]-b[x][y]));
-		uint cost_now;
-		for(int d=1;d<disp_max+1;d+=step)
-		{
-			cost_now=abs((float)(a[x][y]-b[x][y-d]));
-			if(cost>cost_now)
-			{
-				disp[x][y]=d;
-				cost=cost_now;
-			}
-		}
-	}
-}*/
-
-
-__global__ void stereo_kernel(uint (*a)[cols],uint (*b)[cols],uchar (*disp)[cols])
+ __global__ void stereo_kernel(uint (*a)[cols],uint (*b)[cols],uchar (*disp)[cols])
 {
 	const uint x=(blockIdx.x*blockDim.x)+threadIdx.x;
 	const uint y=(blockIdx.y*blockDim.y)+threadIdx.y;
@@ -103,17 +98,125 @@ __global__ void stereo_kernel(uint (*a)[cols],uint (*b)[cols],uchar (*disp)[cols
 
 		__syncthreads();
 		disp[x][y]=0;
-		uint cost=abs((float)(sh_left[threadIdx.x][threadIdx.y])-(sh_right[threadIdx.x][threadIdx.y+disp_max])); //(float)(b[x][y])
+		uint cost=abs((float)(sh_left[threadIdx.x][threadIdx.y]-sh_right[threadIdx.x][threadIdx.y+disp_max])); //(float)(b[x][y])
 		uint cost_now;
 		for(int d=1;d<disp_max+1;d+=step)
 		{
-			cost_now=abs((float)(sh_left[threadIdx.x][threadIdx.y])-(sh_right[threadIdx.x][threadIdx.y+(disp_max-d)]));  //(float)(b[x][y-d])
+			cost_now=abs((float)(sh_left[threadIdx.x][threadIdx.y]-sh_right[threadIdx.x][threadIdx.y+(disp_max-d)]));  //(float)(b[x][y-d])
 			if(cost>cost_now)
 			{
 				disp[x][y]=d;
 				cost=cost_now;
 			}
 		}
+	}
+}
+ */
+__global__ void stereo_kernel(uint (*a)[cols],uint (*b)[cols],uchar (*disp)[cols])
+{
+	const uint x=(blockIdx.x*blockDim.x)+threadIdx.x;
+	const uint y=(blockIdx.y*blockDim.y)+threadIdx.y;
+	__shared__ uint sh_left[block_size_x+2][block_size_y+2];
+	__shared__ uint sh_right[block_size_x+2][block_size_y+disp_max+2];
+
+	int y1=blockIdx.y*blockDim.y+threadIdx.y-disp_max;
+	int y2=blockIdx.y*blockDim.y+threadIdx.y+64-disp_max;
+	int y3=blockIdx.y*blockDim.y+threadIdx.y+128-disp_max;
+
+	if((y>disp_max)&&(y<cols-1)&&(x>1)&&(x<rows-1))
+	{
+		//configure left shared memory
+		sh_left[threadIdx.x][threadIdx.y]=a[x-1][y-1];
+		if(threadIdx.x<2)
+		{
+			sh_left[threadIdx.x+2][threadIdx.y]=a[x+1][y-1];
+		}
+		if(threadIdx.y<2)
+		{
+			sh_left[threadIdx.x][threadIdx.y+64]=a[x-1][y+63];
+		}
+		if((threadIdx.x<2)&&(threadIdx.y<2))
+		{
+			sh_left[threadIdx.x+2][threadIdx.y+64]=a[x+1][y+63];
+		}
+
+		//configure right shared memory
+		if(threadIdx.y<32)
+		{
+			sh_right[threadIdx.x][threadIdx.y]         =b[x-1][y1-1];
+			sh_right[threadIdx.x][threadIdx.y+64]      =b[x-1][y2-1];
+			sh_right[threadIdx.x][threadIdx.y+128]     =b[x-1][y3-1];
+			sh_right[threadIdx.x][threadIdx.y+disp_max]=b[x-1][y-1];
+			if(threadIdx.x<2)
+			{
+				sh_right[threadIdx.x+2][threadIdx.y]         =b[x+1][y1-1];
+				sh_right[threadIdx.x+2][threadIdx.y+64]      =b[x+1][y2-1];
+				sh_right[threadIdx.x+2][threadIdx.y+128]     =b[x+1][y3-1];
+				sh_right[threadIdx.x+2][threadIdx.y+disp_max]=b[x+1][y-1];
+			}
+			if(threadIdx.y<2)
+			{
+				sh_right[threadIdx.x][threadIdx.y+224]=b[x-1][blockIdx.y*blockDim.y+63];
+			}
+			if((threadIdx.x<2)&&(threadIdx.y<2))
+			{
+				sh_right[threadIdx.x+2][threadIdx.y+224]=b[x+1][blockIdx.y*blockDim.y+63];
+			}
+		}
+		else
+		{
+			sh_right[threadIdx.x][threadIdx.y]         =b[x-1][y1-1];
+			sh_right[threadIdx.x][threadIdx.y+64]      =b[x-1][y2-1];
+			sh_right[threadIdx.x][threadIdx.y+disp_max]=b[x-1][y-1];
+			if(threadIdx.x<2)
+			{
+				sh_right[threadIdx.x+2][threadIdx.y]         =b[x+1][y1-1];
+				sh_right[threadIdx.x+2][threadIdx.y+64]      =b[x+1][y2-1];
+				sh_right[threadIdx.x+2][threadIdx.y+disp_max]=b[x+1][y-1];
+			}
+			if(threadIdx.y<2)
+			{
+				sh_right[threadIdx.x][threadIdx.y+224]=b[x-1][blockIdx.y*blockDim.y+63];
+			}
+			if((threadIdx.x<2)&&(threadIdx.y<2))
+			{
+				sh_right[threadIdx.x+2][threadIdx.y+224]=b[x+1][blockIdx.y*blockDim.y+63];
+			}
+		}
+
+		__syncthreads();
+		disp[x][y]=0;
+		uint cost=		(//abs((float)(sh_left[threadIdx.x][threadIdx.y]-sh_right[threadIdx.x][threadIdx.y+disp_max]))
+						+abs((float)(sh_left[threadIdx.x][threadIdx.y+1]-sh_right[threadIdx.x][threadIdx.y+disp_max+1]))
+						//+abs((float)(sh_left[threadIdx.x][threadIdx.y+2]-sh_right[threadIdx.x][threadIdx.y+disp_max+2]))
+						+abs((float)(sh_left[threadIdx.x+1][threadIdx.y]-sh_right[threadIdx.x+1][threadIdx.y+disp_max]))
+						+abs((float)(sh_left[threadIdx.x+1][threadIdx.y+1]-sh_right[threadIdx.x+1][threadIdx.y+disp_max+1]))
+						+abs((float)(sh_left[threadIdx.x+1][threadIdx.y+2]-sh_right[threadIdx.x+1][threadIdx.y+disp_max+2]))
+						//+abs((float)(sh_left[threadIdx.x+2][threadIdx.y]-sh_right[threadIdx.x+2][threadIdx.y+disp_max]))
+						+abs((float)(sh_left[threadIdx.x+2][threadIdx.y+1]-sh_right[threadIdx.x+2][threadIdx.y+disp_max+1]))
+						/*+abs((float)(sh_left[threadIdx.x+2][threadIdx.y+2]-sh_right[threadIdx.x+2][threadIdx.y+disp_max+2]))*/)/9; //(float)(b[x][y])
+		uint cost_now;
+		for(int d=1;d<disp_max+1;d+=step)
+		{
+			cost_now=		(//abs((float)(sh_left[threadIdx.x][threadIdx.y]-sh_right[threadIdx.x][threadIdx.y+(disp_max-d)]))
+							+abs((float)(sh_left[threadIdx.x][threadIdx.y+1]-sh_right[threadIdx.x][threadIdx.y+(disp_max-d)+1]))
+							//+abs((float)(sh_left[threadIdx.x][threadIdx.y+2]-sh_right[threadIdx.x][threadIdx.y+(disp_max-d)+2]))
+							+abs((float)(sh_left[threadIdx.x+1][threadIdx.y]-sh_right[threadIdx.x+1][threadIdx.y+(disp_max-d)]))
+							+abs((float)(sh_left[threadIdx.x+1][threadIdx.y+1]-sh_right[threadIdx.x+1][threadIdx.y+(disp_max-d)+1]))
+							+abs((float)(sh_left[threadIdx.x+1][threadIdx.y+2]-sh_right[threadIdx.x+1][threadIdx.y+(disp_max-d)+2]))
+							//+abs((float)(sh_left[threadIdx.x+2][threadIdx.y]-sh_right[threadIdx.x+2][threadIdx.y+(disp_max-d)]))
+							+abs((float)(sh_left[threadIdx.x+2][threadIdx.y+1]-sh_right[threadIdx.x+2][threadIdx.y+(disp_max-d)+1]))
+							/*+abs((float)(sh_left[threadIdx.x+2][threadIdx.y+2]-sh_right[threadIdx.x+2][threadIdx.y+(disp_max-d)+2]))*/)/9;  //(float)(b[x][y-d])
+			if(cost>cost_now)
+			{
+				disp[x][y]=d;
+				cost=cost_now;
+			}
+		}
+	}
+	else
+	{
+		disp[x][y]=0;
 	}
 }
 
@@ -183,6 +286,7 @@ int main()
 
 	imshow("左图",im1);
 
+	//锁页内存
 	cudaHostAlloc( (void**)&cpu_p1,rows*cols*sizeof(uint),cudaHostAllocDefault);
 	cudaHostAlloc( (void**)&cpu_p2,rows*cols*sizeof(uint),cudaHostAllocDefault);
 
@@ -197,11 +301,11 @@ int main()
 
 	//自动补位
 	size_t pitch;
-	cudaMallocPitch(&gpu_p1,&pitch,cols*sizeof(uint),rows);
-	cudaMallocPitch(&gpu_p2,&pitch,cols*sizeof(uint),rows);
-	cudaMallocPitch(&gpu_p3,&pitch,cols*sizeof(uchar),rows);
-	cudaMallocPitch(&gpu_p4,&pitch,cols*sizeof(uchar),rows);
-	cudaMallocPitch(&temp,&pitch,cols*sizeof(uchar),rows);
+	cudaMallocPitch((void **)&gpu_p1,&pitch,cols*sizeof(uint),rows);
+	cudaMallocPitch((void **)&gpu_p2,&pitch,cols*sizeof(uint),rows);
+	cudaMallocPitch((void **)&gpu_p3,&pitch,cols*sizeof(uchar),rows);
+	cudaMallocPitch((void **)&gpu_p4,&pitch,cols*sizeof(uchar),rows);
+	cudaMallocPitch((void **)&temp,&pitch,cols*sizeof(uchar),rows);
 
 	cudaMemcpyAsync(gpu_p1,cpu_p1,rows*cols*sizeof(uint),cudaMemcpyHostToDevice);
 	cudaMemcpyAsync(gpu_p2,cpu_p2,rows*cols*sizeof(uint),cudaMemcpyHostToDevice);
@@ -212,11 +316,9 @@ int main()
 
 	cudaMemcpy(im3.data,gpu_p4,rows*cols*sizeof(uchar),cudaMemcpyDeviceToHost);
 
-	//medianBlur(im3,im3,3);
-	//blur(im3,im3,Size(3,3),Point(-1,-1));
 	imshow("视差图",im3);
 	imwrite("disp.bmp",im3);
-	//waitKey(0);
+	waitKey(0);
 
 	return 0;
 }
